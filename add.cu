@@ -2,7 +2,11 @@
 #include <math.h>
 // Kernel function to add the elements of two arrays
 __global__ void add(int n, float *x, float *y) {
-  for (int i = 0; i < n; i++)
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride = blockDim.x * gridDim.x; // total number of threads in the grid
+  // the way it is written, incrementing by stride will also make index > n
+  // CUDA-land refers to this as a grid-stride loop
+  for (int i = index; i < n; i += stride)
     y[i] = x[i] + y[i];
 }
 
@@ -21,7 +25,10 @@ int main(void) {
   }
 
   // Run kernel on 1M elements on the GPU
-  add<<<1, 1>>>(N, x, y);
+  static constexpr int BLOCK_SIZE = 256;
+  int numBlocks = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  // 1 thread per vector element
+  add<<<numBlocks, 256>>>(N, x, y);
 
   // Wait for GPU to finish before accessing on host
   cudaDeviceSynchronize();
